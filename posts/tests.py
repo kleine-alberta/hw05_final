@@ -170,3 +170,13 @@ class TestSuits(TestCase):
         )
         response = self.client.get(reverse('follow_index'))
         self.assertContains(response, new_follow_post.text, status_code=200)
+
+    def test_new_post_doesnt_appear_at_non_followers(self):
+        author = get_user_model().objects.create_user(username='TestUser')
+        Post.objects.create(
+            text=("moeow-meow"),
+            author=author,
+            group=self.group
+        )
+        response = self.client.get(reverse("follow_index"))
+        self.assertNotContains(response, "moeow-meow")
