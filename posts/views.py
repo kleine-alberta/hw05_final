@@ -152,6 +152,8 @@ def follow_index(request):
 def profile_follow(request, username):
     user = request.user
     author = get_object_or_404(get_user_model(), username=username)
+    if user.username == author.username:
+        return redirect('profile', username=username)
     Follow.objects.get_or_create(user=user, author=author)
     return redirect('profile', username=username)
 
