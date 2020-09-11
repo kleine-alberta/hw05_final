@@ -23,8 +23,8 @@ class Post(models.Model):
                               on_delete=models.SET_NULL,
                               blank=True,
                               null=True,
-                              related_name="posts")
-    image = models.ImageField(upload_to='posts/', blank=True, null=True)
+                              related_name="groups")
+    image = models.ImageField(upload_to='posts/', blank=True, null=True, verbose_name="изображение")
 
     def __str__(self):
         return f'Post text={self.text[:100]}'
@@ -55,3 +55,7 @@ class Follow(models.Model):
                                on_delete=models.SET_NULL,
                                null=True,
                                related_name="following")
+
+    class Meta:
+        unique_together = ("user", "author")
+

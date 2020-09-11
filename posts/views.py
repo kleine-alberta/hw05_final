@@ -10,7 +10,6 @@ from .models import Post, Group, Comment, Follow
 from .forms import PostForm, CommentForm
 
 
-@cache_page(20, key_prefix="index_page")
 def index(request):
     template_name = "index.html"
     post_list = Post.objects.all()
@@ -137,9 +136,7 @@ def add_comment(request, username, post_id):
 
 @login_required
 def follow_index(request):
-    author_follow = request.user.follower.all()
-    author_list = [author.author for author in author_follow]
-    post_list = Post.objects.filter(author__in=author_list)
+    post_list = Post.objects.filter(author__following__user=request.user)
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
@@ -156,9 +153,9 @@ def profile_follow(request, username):
     user = request.user
     author = get_object_or_404(get_user_model(), username=username)
     authors = Follow.objects.filter(user=user, author=author)
-    if authors.exists() or user.username == author.username:
-        return redirect('profile', username=username)
-    Follow.objects.create(user=user, author=author)
+    #if authors.exists() or user.username == author.username:
+        #return redirect('profile', username=username)
+    Follow.objects.get_or_create(user=user, author=author)
     return redirect('profile', username=username)
 
 
