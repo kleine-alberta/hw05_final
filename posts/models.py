@@ -24,7 +24,10 @@ class Post(models.Model):
                               blank=True,
                               null=True,
                               related_name="groups")
-    image = models.ImageField(upload_to='posts/', blank=True, null=True, verbose_name="изображение")
+    image = models.ImageField(upload_to='posts/',
+                              blank=True,
+                              null=True,
+                              verbose_name="изображение")
 
     def __str__(self):
         return f'Post text={self.text[:100]}'
@@ -58,4 +61,3 @@ class Follow(models.Model):
 
     class Meta:
         unique_together = ("user", "author")
-

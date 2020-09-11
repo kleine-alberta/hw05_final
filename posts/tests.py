@@ -1,15 +1,18 @@
 import shutil
+import tempfile
+import os
 from django.test import TestCase
 from django.test.client import Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
 from posts.models import Group, Post, User, Comment, Follow
 
 from django.test import override_settings
 
-TEST_DIR = 'test'
+temp = 'test'
 
 
 class TestSuits(TestCase):
@@ -28,7 +31,7 @@ class TestSuits(TestCase):
 
     def tearDown(self):
         try:
-            shutil.rmtree(TEST_DIR)
+            shutil.rmtree(temp)
         except OSError:
             pass
 
@@ -69,6 +72,7 @@ class TestSuits(TestCase):
                                             group=self.group.id).exists())
 
     def test_new_post_appears_everywhere(self):
+        cache.clear()
         new_post = Post.objects.create(
             text='тестовая запись',
             author=self.user,
@@ -77,6 +81,7 @@ class TestSuits(TestCase):
         self.check_response(new_post)
 
     def test_check_edited_post_is_everyweher(self):
+        cache.clear()
         response = self.client.post(reverse('post_edit',
                                             args=[self.post.author.username,
                                                   self.post.id]),
@@ -90,8 +95,9 @@ class TestSuits(TestCase):
         resp = self.client.get('/profile/none/')
         self.assertEqual(resp.status_code, 404)
 
-    @override_settings(MEDIA_ROOT=(TEST_DIR + '/media'))
+    @override_settings(MEDIA_ROOT=(temp + '/media'))
     def test_tag_img_exists_in_post_page(self):
+        cache.clear()
         small_gif = (
             b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04'
             b'\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02'
@@ -100,23 +106,23 @@ class TestSuits(TestCase):
         img = SimpleUploadedFile('small.gif', small_gif,
                                  content_type='image/gif')
         data = {
-            'text': 'post with image',
-            'group': self.group.id,
-            'image': img,
-        }
+                'text': 'post with image',
+                'group': self.group.id,
+                'image': img,
+                }
         post = self.client.post(reverse('new_post'), data=data, follow=True)
         urls = [
-            reverse('index'),
-            reverse('profile', args=[self.post.author.username]),
-            reverse('post', args=[self.post.author.username,
-                                  self.post.id + 1]),
-            reverse('group', args=[self.group.slug]),
-            ]
+                reverse('index'),
+                reverse('profile', args=[self.post.author.username]),
+                reverse('post', args=[self.post.author.username,
+                                      self.post.id + 1]),
+                reverse('group', args=[self.group.slug]),
+                ]
         for url in urls:
             post = self.client.post(url)
             self.assertIn('<img'.encode(), post.content)
 
-    @override_settings(MEDIA_ROOT=(TEST_DIR + '/media'))
+    @override_settings(MEDIA_ROOT=(temp + '/media'))
     def test_non_graffic_format_load(self):
         small_gif = (
             b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04'
@@ -132,6 +138,7 @@ class TestSuits(TestCase):
                                  'image': img})
         form = resp.context['form']
         self.assertFalse(form.is_valid())
+        self.assertFormError(resp, 'form', 'image', form.errors['image'])
 
     def test_cache_work(self):
         self.client.get(reverse('index'))
@@ -141,16 +148,23 @@ class TestSuits(TestCase):
         post_1 = self.client.get(reverse('index'))
         self.assertNotIn("проверка кэша".encode(), post_1.content)
 
-    def test_authorized_user_can_make_and_cancel_subscribes(self):
-        author = get_user_model().objects.create_user(username='TestUser')
-        follower = Follow.objects.create(user=self.user, author=author)
-        response = self.client.post(reverse('profile', args=[follower.author]))
+    def test_authorized_user_can_make_subscribes(self):
+        self.client.post(reverse('profile_follow',
+                                 args=[self.post.author.username]))
+        response = self.client.post(reverse('profile', args=[self.user]))
+        followers = response.context['followers']
         self.assertEqual(response.status_code, 200)
         self.assertIn("Отписаться".encode(), response.content)
+        self.assertEqual(followers, 1)
 
-        self.client.post(reverse('profile_unfollow', args=[follower.author]))
-        resp = self.client.post(reverse('profile', args=[follower.author]))
+    def test_autorized_user_can_cancel_subscibes(self):
+        self.client.post(reverse('profile_unfollow',
+                                 args=[self.post.author.username]))
+        resp = self.client.post(reverse('profile', args=[self.user]))
+        followers = resp.context['followers']
+        self.assertEqual(resp.status_code, 200)
         self.assertIn("Подписаться".encode(), resp.content)
+        self.assertEqual(followers, 0)
 
     def test_autorized_user_can_make_comments(self):
         response = self.client.post(reverse('add_comment',

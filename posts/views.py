@@ -28,7 +28,7 @@ def index(request):
 def group_posts(request, slug):
     template_name = 'group.html'
     group = get_object_or_404(Group, slug=slug)
-    post_list = group.posts.all()
+    post_list = group.groups.all()
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
@@ -152,9 +152,6 @@ def follow_index(request):
 def profile_follow(request, username):
     user = request.user
     author = get_object_or_404(get_user_model(), username=username)
-    authors = Follow.objects.filter(user=user, author=author)
-    #if authors.exists() or user.username == author.username:
-        #return redirect('profile', username=username)
     Follow.objects.get_or_create(user=user, author=author)
     return redirect('profile', username=username)
 
@@ -164,6 +161,5 @@ def profile_unfollow(request, username):
     user = request.user
     author = get_object_or_404(get_user_model(), username=username)
     follow_obj = Follow.objects.filter(user=user, author=author)
-    if follow_obj.exists():
-        follow_obj.delete()
+    follow_obj.delete()
     return redirect("profile", username=username)

@@ -18,7 +18,6 @@ class PostForm(forms.ModelForm):
         model = Post
         fields = ("group", "text", "image")
 
-
     def clean_text(self):
         text = self.cleaned_data["text"]
         if text is None:
