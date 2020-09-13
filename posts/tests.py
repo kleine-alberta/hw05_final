@@ -125,20 +125,23 @@ class TestSuits(TestCase):
     @override_settings(MEDIA_ROOT=(temp + '/media'))
     def test_non_graffic_format_load(self):
         small_gif = (
-            b'\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x00\x00\x00\x21\xf9\x04'
-            b'\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02'
-            b'\x02\x4c\x01\x00\x3b'
+            b"\x01\x0a\x00\x01\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02"
+            b"\x02\x4c\x01\x00\x3b"
         )
-        img = SimpleUploadedFile('small.txt', small_gif,
-                                 content_type='image/txt')
-        resp = self.client.post(reverse('post_edit',
-                                args=[self.user.username, self.post.id]),
+        img = SimpleUploadedFile('small.doc', small_gif,
+                                 content_type='doc')
+        resp = self.client.post(reverse('new_post'),
                                 {'author': self.user,
                                  'text': 'post with no image',
+                                 'group': self.group.id,
                                  'image': img})
         form = resp.context['form']
         self.assertFalse(form.is_valid())
         self.assertFormError(resp, 'form', 'image', form.errors['image'])
+        self.assertFormError(resp, 'form', 'image',
+                             'Загрузите правильное изображение. '
+                             'Файл, который вы загрузили, '
+                             'поврежден или не является изображением.')
 
     def test_cache_work(self):
         self.client.get(reverse('index'))
@@ -149,20 +152,24 @@ class TestSuits(TestCase):
         self.assertNotIn("проверка кэша".encode(), post_1.content)
 
     def test_authorized_user_can_make_subscribes(self):
-        self.client.post(reverse('profile_follow',
-                                 args=[self.post.author.username]))
+        author = get_user_model().objects.create_user(username='TestUser')
+        self.client.post(reverse('profile_follow', args=[author]))
+        resp = self.client.post(reverse('profile', args=[author]))
+        response = self.client.post(reverse('profile', args=[self.user]))
+        follower = response.context['followers']
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Отписаться".encode(), resp.content)
+        self.assertEqual(follower, 1)
+
+    def test_autorized_user_can_cancel_subscibes(self):
+        author = get_user_model().objects.create_user(username='TestUser')
+        self.client.post(reverse('profile_follow', args=[author]))
+        self.client.post(reverse('profile_unfollow',
+                                 args=[author]))
+        resp = self.client.post(reverse('profile', args=[author]))
         response = self.client.post(reverse('profile', args=[self.user]))
         followers = response.context['followers']
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Отписаться".encode(), response.content)
-        self.assertEqual(followers, 1)
-
-    def test_autorized_user_can_cancel_subscibes(self):
-        self.client.post(reverse('profile_unfollow',
-                                 args=[self.post.author.username]))
-        resp = self.client.post(reverse('profile', args=[self.user]))
-        followers = resp.context['followers']
-        self.assertEqual(resp.status_code, 200)
         self.assertIn("Подписаться".encode(), resp.content)
         self.assertEqual(followers, 0)
 
